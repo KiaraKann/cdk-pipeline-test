@@ -1,0 +1,35 @@
+version: 0.2
+env:
+  parameter-store:
+    ID_RSA: "ID_RSA"
+
+phases:
+  install:
+    commands:
+      - mkdir -p ~/.ssh
+      - echo "$ID_RSA" > ~/.ssh/id_rsa
+      - chmod 600 ~/.ssh/id_rsa
+      # - aws s3 cp $CONFIG_S3_URI $CODEBUILD_SRC_DIR/order_finance_backend/settings/prod.py
+      # - cp $CODEBUILD_SRC_DIR$DOCKERFILE_SOURCE $CODEBUILD_SRC_DIR$DOCKERFILE_DEST
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      - eval $(ssh-agent)
+      - ssh-add ~/.ssh/id_rsa  | echo ''
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - DOCKER_BUILDKIT=1 docker build -t $IMAGE_NAME:$CODEBUILD_BUILD_NUMBER -t $IMAGE_NAME:latest --ssh default=$SSH_AUTH_SOCK .
+      - docker tag $IMAGE_NAME:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:latest
+      - docker tag $IMAGE_NAME:$CODEBUILD_BUILD_NUMBER $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:$CODEBUILD_BUILD_NUMBER
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:latest
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:$CODEBUILD_BUILD_NUMBER
+      - printf '[{"name":"cdk-pipeline-test","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:$CODEBUILD_BUILD_NUMBER > imagedefinitions.json
+artifacts:
+  files: imagedefinitions.json

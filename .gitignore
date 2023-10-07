@@ -1,0 +1,23 @@
+myenv
+
+# vscode
+.vscode
+
+# python/django
+__pycache__
+migrations
+.venv
+*.sock
+*.db
+db.sqlite3
+prod.py
+# config
+dev_databases.py
+export.py
+ex_database.py
+# test
+.coverage
+coverage.xml
+try_*.py
+test_*.json
+*.csv
